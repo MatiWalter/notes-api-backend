@@ -1,58 +1,57 @@
+require('dotenv').config();
+require('./mongo');
 const express = require('express');
 const cors = require('cors');
-const logger = require('./loggerMiddleware');
+const Note = require('./models/Note');
+const notFound = require('./middleware/notFound');
+const handleErrors = require('./middleware/handleErrors');
 
 const app = express();
 
 app.use(cors());
 app.use(express.json());
-
-app.use(logger);
-
-let notes = [
-  {
-    id: 1,
-    content: 'HTML is easy',
-    date: '2019-05-30T17:30:31.098Z',
-    important: true,
-  },
-  {
-    id: 2,
-    content: 'Browser can execute only Javascript',
-    date: '2019-05-30T18:39:34.091Z',
-    important: false,
-  },
-  {
-    id: 3,
-    content: 'GET and POST are the most important methods of HTTP protocol',
-    date: '2019-05-30T19:20:14.298Z',
-    important: true,
-  },
-];
+// app.use('/images', express.static('images'));
 
 app.get('/', (req, res) => {
   res.send('<h1>Hello World</h1>');
 });
 
 app.get('/api/notes', (req, res) => {
-  res.json(notes);
+  Note.find({})
+    .then((note) => res.json(note));
 });
 
-app.get('/api/notes/:id', (req, res) => {
-  const id = Number(req.params.id);
-  const note = notes.find((n) => n.id === id);
-  if (note) {
-    res.json(note);
-  } else {
-    res.status(404).end();
-  }
-  // note ? res.json(note) : res.status(404).end();
+app.get('/api/notes/:id', (req, res, next) => {
+  const { id } = req.params;
+
+  Note.findById(id)
+    .then((note) => (note
+      ? res.json(note)
+      : res.status(400).end()))
+    .catch((err) => next(err));
 });
 
-app.delete('/api/notes/:id', (req, res) => {
-  const id = Number(req.params.id);
-  notes = notes.filter((note) => note.id !== id);
-  res.status(204).end();
+app.put('/api/notes/:id', (req, res, next) => {
+  const { id } = req.params;
+  const note = req.body;
+
+  const newNoteInfo = {
+    content: note.content,
+    important: note.important,
+  };
+  Note.findByIdAndUpdate(id, newNoteInfo, { new: true })
+    .then((result) => {
+      res.json(result);
+    })
+    .catch(next);
+});
+
+app.delete('/api/notes/:id', (req, res, next) => {
+  const { id } = req.params;
+  Note.findByIdAndDelete(id)
+    .then(() => {
+      res.status(204).end();
+    }).catch((err) => next(err));
 });
 
 // eslint-disable-next-line consistent-return
@@ -60,34 +59,27 @@ app.post('/api/notes', (req, res) => {
   const note = req.body;
 
   if (!note || !note.content) {
-    return res.status(404).json({
-      error: 'note.content is missing',
-    });
+    return res.status(404)
+      .json({
+        error: 'note.content is missing',
+      });
   }
 
-  const ids = notes.map((n) => n.id);
-  const maxId = Math.max(...ids);
-
-  const newNote = {
-    id: maxId + 1,
+  const newNote = new Note({
     content: note.content,
     date: new Date().toISOString(),
-    important: typeof note.important !== 'undefined' ? note.important : false,
-  };
+    important: note.important || false,
+  });
 
-  notes = [...notes, newNote];
-
-  res.status(201).json(newNote);
-});
-
-app.use((req, res) => {
-  console.log(req.path);
-  res.status(404).json({
-    error: 'Not found',
+  newNote.save().then((savedNote) => {
+    res.json(savedNote);
   });
 });
 
-const PORT = process.env.PORT || 3001;
+app.use(notFound);
+app.use(handleErrors);
+
+const { PORT } = process.env;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
