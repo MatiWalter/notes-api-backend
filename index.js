@@ -1,12 +1,12 @@
 require('dotenv').config();
 require('./mongo');
 const express = require('express');
+
+const app = express();
 const cors = require('cors');
 const Note = require('./models/Note');
 const notFound = require('./middleware/notFound');
 const handleErrors = require('./middleware/handleErrors');
-
-const app = express();
 
 app.use(cors());
 app.use(express.json());
@@ -16,9 +16,9 @@ app.get('/', (req, res) => {
   res.send('<h1>Hello World</h1>');
 });
 
-app.get('/api/notes', (req, res) => {
-  Note.find({})
-    .then((note) => res.json(note));
+app.get('/api/notes', async (req, res) => {
+  const notes = await Note.find({});
+  res.json(notes);
 });
 
 app.get('/api/notes/:id', (req, res, next) => {
@@ -46,16 +46,16 @@ app.put('/api/notes/:id', (req, res, next) => {
     .catch(next);
 });
 
-app.delete('/api/notes/:id', (req, res, next) => {
-  const { id } = req.params;
-  Note.findByIdAndDelete(id)
-    .then(() => {
-      res.status(204).end();
-    }).catch((err) => next(err));
+app.delete('/api/notes/:id', async (req, res) => {
+  const response = await Note.findByIdAndRemove(req.params.id);
+  if (response === null) {
+    res.sendStatus(404);
+  } else {
+    res.status(204).end();
+  }
 });
 
-// eslint-disable-next-line consistent-return
-app.post('/api/notes', (req, res) => {
+app.post('/api/notes', async (req, res, next) => {
   const note = req.body;
 
   if (!note || !note.content) {
@@ -71,15 +71,28 @@ app.post('/api/notes', (req, res) => {
     important: note.important || false,
   });
 
-  newNote.save().then((savedNote) => {
+  // newNote.save().then((savedNote) => {
+  //   res.json(savedNote);
+  // }).catch((err) => next(err));
+  let savedNote;
+  try {
+    savedNote = await newNote.save();
     res.json(savedNote);
-  });
+  } catch (err) {
+    next(err);
+  }
+  return savedNote;
 });
 
 app.use(notFound);
 app.use(handleErrors);
 
 const { PORT } = process.env;
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
+
+module.exports = {
+  app,
+  server,
+};

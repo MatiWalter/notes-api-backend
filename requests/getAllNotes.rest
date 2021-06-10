@@ -4,14 +4,14 @@ GET http://localhost:3001/api/notes HTTP/1.1
 GET http://localhost:3001/api/notes/60aafb047791912218082865 HTTP/1.1
 
 ### 
-DELETE http://localhost:3001/api/notes/60ab0bca2dde880a34a9ef08 HTTP/1.1
+DELETE http://localhost:3001/api/notes/60ac259da8d8b745940495d1 HTTP/1.1
 
 ###
 POST http://localhost:3001/api/notes HTTP/1.1 
 content-Type: application/json
 
 {
-  "content": "GET and POST are the most important methods of HTTP protocol",
+  "content": "DB testeo",
   "important": true
 }
 
