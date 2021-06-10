@@ -6,61 +6,66 @@ const { api, initialNotes, getAllContentFromNotes } = require('./helpers');
 beforeEach(async () => {
   await Note.deleteMany({});
 
+  // Paralelo
   const notesObjects = initialNotes.map((note) => new Note(note));
   const promises = notesObjects.map((note) => note.save());
   await Promise.all(promises);
 });
 
-test('notes are returned as json', async () => {
-  await api
-    .get('/api/notes')
-    .expect(200)
-    .expect('Content-Type', /application\/json/);
+describe('GET all notes', () => {
+  test('notes are returned as json', async () => {
+    await api
+      .get('/api/notes')
+      .expect(200)
+      .expect('Content-Type', /application\/json/);
+  });
+
+  test('there are two notes', async () => {
+    const res = await api.get('/api/notes');
+    expect(res.body).toHaveLength(initialNotes.length);
+  });
+
+  test('is test note 1', async () => {
+    const {
+      contents,
+    } = await getAllContentFromNotes();
+
+    expect(contents).toContain('Nota testeo 1');
+  });
 });
 
-test('there are two notes', async () => {
-  const res = await api.get('/api/notes');
-  expect(res.body).toHaveLength(initialNotes.length);
-});
+describe('create a note', () => {
+  test('is possible with a valid note', async () => {
+    const newNote = {
+      content: 'Proximamente async/await',
+      important: true,
+    };
 
-test('is test note 1', async () => {
-  const {
-    contents,
-  } = await getAllContentFromNotes();
+    await api
+      .post('/api/notes')
+      .send(newNote)
+      .expect(200)
+      .expect('Content-Type', /application\/json/);
 
-  expect(contents).toContain('Nota testeo 1');
-});
+    const { contents, res } = await getAllContentFromNotes();
 
-test('a valid note can be added', async () => {
-  const newNote = {
-    content: 'Proximamente async/await',
-    important: true,
-  };
+    expect(res.body).toHaveLength(initialNotes.length + 1);
+    expect(contents).toContain(newNote.content);
+  });
 
-  await api
-    .post('/api/notes')
-    .send(newNote)
-    .expect(200)
-    .expect('Content-Type', /application\/json/);
+  test('is not possible with an invalid note', async () => {
+    const newNote = {
+      important: true,
+    };
 
-  const { contents, res } = await getAllContentFromNotes();
+    await api
+      .post('/api/notes')
+      .send(newNote)
+      .expect(404);
 
-  expect(res.body).toHaveLength(initialNotes.length + 1);
-  expect(contents).toContain(newNote.content);
-});
-
-test('note without content id not added', async () => {
-  const newNote = {
-    important: true,
-  };
-
-  await api
-    .post('/api/notes')
-    .send(newNote)
-    .expect(404);
-
-  const res = await api.get('/api/notes');
-  expect(res.body).toHaveLength(initialNotes.length);
+    const res = await api.get('/api/notes');
+    expect(res.body).toHaveLength(initialNotes.length);
+  });
 });
 
 test('a note can be deleted', async () => {
